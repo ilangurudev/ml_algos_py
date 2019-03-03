@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1549644890831.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3849633926",
+    "id" : "9F49C1C5",
+    "lastKnownWriteTime" : 1549652780,
+    "last_content_update" : 1549652780678,
+    "path" : "~/Downloads/ml/hw1/knn.py",
+    "project_path" : "knn.py",
+    "properties" : {
+        "cursorPosition" : "18,63",
+        "scrollLine" : "5"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "python"
+}

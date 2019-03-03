@@ -1,0 +1,87 @@
+import pandas as pd
+import numpy as np
+import collections
+
+
+df_train_org = pd.read_csv("data/train.csv")
+df_train = df_train_org.copy()
+df_test_org = pd.read_csv("data/test.csv")
+df_test = df_test_org.copy()
+print(df_train_org.shape, df_test_org.shape)
+
+df_train[["is_affected"]] = df_train[["area"]] > 0
+df_test[["is_affected"]] = df_test[["area"]] > 0
+df_train.head()
+
+[df_train[c].dtype for c in df_train.columns]
+
+df_train["month"] = pd.Categorical(df_train["month"], ordered=True)
+df_train["day"] = pd.Categorical(df_train["day"], ordered=True)
+
+df_train = df_train.loc[:, df_train.columns != "area"]
+df_test = df_test.loc[:, df_test.columns != "area"]
+df_tr = df_train.groupby("is_affected").apply(lambda x: x.sample(30)).reset_index(level = 0, drop = True)
+df_ts = df_train.groupby("is_affected").apply(lambda x: x.sample(3)).reset_index(level = 0, drop = True)
+print(df_ts)
+
+
+def calc_dist_from_train(df_tr, vec):
+    x = df_tr.apply(lambda row: (((row.astype('float32')  - vec.astype('float32'))**2).sum())**0.5, axis = 1)
+    return x
+
+
+def dist_matrix(df_tr, df_ts):
+    dists = df_ts.apply(lambda row: calc_dist_from_train(df_tr, row), axis=1)
+    return dists
+
+def get_nearest_neighbour_indices(dist_matrix, k):
+    indices = dist_matrix.columns
+    return dist_matrix.apply(lambda r: indices[np.argpartition(r, k)][:k], axis=1)
+
+def count_votes(df_tr, indice_matrix, label):
+#     print(df_tr.loc[indice_matrix[1], label])
+    return indice_matrix.apply(lambda r: collections.Counter(df_tr.loc[r, label]))
+
+def tag_winner(vote_mat):
+    return vote_mat.apply(lambda r: r.most_common(1)[0][0])
+
+
+def get_knn_preds(df_tr, df_ts, k, label_col):
+#     df_tr_labs = df_tr.copy()
+#     df_ts_labs = df_ts.copy()
+    df_tr_labs = df_tr[[label_col]]
+    df_tr = df_tr.loc[:,df_tr.columns != label_col]
+    df_ts = df_ts.loc[:,df_ts.columns != label_col]
+    d = dist_matrix(df_tr, df_ts)
+    neighbours = get_nearest_neighbour_indices(d, k)
+    counts = count_votes(df_tr_labs, neighbours, label_col)
+#     df_ts_labs[['preds']] = tag_winner(counts)
+    return tag_winner(counts)
+
+def fit_knn(df_tr, df_ts, k, label_col, scale = True):
+    if scale:
+        tr_y = df_tr["is_affected"]
+        ts_y = df_ts["is_affected"]
+        mu = df_tr.mean()
+        sd = df_tr.std()
+        df_tr_sc = (df_tr - mu)/sd
+        df_ts_sc = (df_ts - mu)/sd
+        df_tr_sc["is_affected"] = tr_y
+        df_ts_sc["is_affected"] = ts_y
+#         print(df_tr.head(), "\n", df_ts.head())
+        preds = get_knn_preds(df_tr_sc, df_ts_sc, k, label_col)
+    else:
+        preds = get_knn_preds(df_tr, df_ts, k, label_col)
+#     print(preds)
+    df_ts["pred_"+label_col] =  preds
+    return df_ts
+
+def eval_accuracy(df_ts, label_col):
+    return np.mean(df_ts[label_col] == df_ts["pred_"+label_col])
+    
+    
+    
+from sklearn.neighbors import KNeighborsClassifier
+neigh = KNeighborsClassifier(n_neighbors=3)
+neigh.fit(df_train.drop("is_affected",axis=1), df_train.is_affected) 
+(neigh.predict(df_test.drop("is_affected",axis=1)) == df_test.is_affected).mean()
